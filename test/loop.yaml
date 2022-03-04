@@ -1,0 +1,13 @@
+---
+- name: Hello World
+  hosts: localhost
+  connection: 127.0.0.1
+    
+  tasks:
+    - name: loop a bit
+      debug:
+        msg: "{{ item }} - {{ idx }}"
+      loop: [ 101, 102, 103, 104 ]
+      loop_control:
+        index_var: idx
+

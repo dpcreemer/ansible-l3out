@@ -1,0 +1,4 @@
+---
+ansible_connection: local
+use_ssl: True
+validate_certs: False

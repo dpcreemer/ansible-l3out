@@ -1,0 +1,10 @@
+---
+# vars file for l3out
+tenant: ansible
+vrf: prod
+l3out: core
+dom: l3out
+node_prof: leaves-101-102
+pod: 1
+nodes: [101, 102]
+router_ids: [172.31.254.13, 172.31.254.14]

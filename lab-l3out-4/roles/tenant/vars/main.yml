@@ -1,0 +1,6 @@
+---
+# vars file for tenant
+tenant: ansible
+alias: Ansible-Testing
+description: For Testing of Ansible with ACI
+vrf: prod

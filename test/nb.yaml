@@ -1,0 +1,75 @@
+---
+- name: Gather data frome NetBox
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  vars:
+    nb_url: https://netbox.prod.rtp.lab
+    nb_token: 8ba32002b54ae0f5402bc9ec4bc42f0cbf7b8d52
+    vlan: -1
+    vlan_list: [] 
+    nb_description: "ACI tn:ansible L3Out to Core 2"
+    nb_site: "RTP Lab"
+    nb_vlan_group: "ACI1"
+    nb_tenant: "ACI1"
+    nb_role: "ACI 1 L3Out"
+
+  tasks:
+    - name: Get list of used VLANs from NetBox
+      set_fact:
+        vlan_list: "{{ vlan_list + [ item.value.vid ] }}"
+      with_items: "{{ query('netbox.netbox.nb_lookup', 'vlans', api_endpoint=nb_url, token=nb_token, api_filter='vlan_group='+nb_vlan_group, validate_certs=False) }}"
+
+    - name: Find available VLAN
+      set_fact:
+        vlan: "{{ item }}"
+      with_sequence: start=117 end=200
+      when:
+        - "item | int not in vlan_list"
+        - vlan == -1
+
+    - name: Create VLAN in NetBox
+      netbox.netbox.netbox_vlan:
+        netbox_url: "{{ nb_url }}"
+        netbox_token: "{{ nb_token }}"
+        validate_certs: False
+        data:
+          vid: "{{ vlan | int }}"
+          name: "{{ nb_description }}" 
+          site: "{{ nb_site }}"
+          vlan_group: "{{ nb_vlan_group }}"
+          tenant: "{{ nb_tenant }}"
+          vlan_role: "{{ nb_role }}"
+        state: present
+
+    - name: Get a new /29 from 198.18.226.0/24 and tag it with the VLAN
+      netbox_prefix:
+        netbox_url: "{{ nb_url }}"
+        netbox_token: "{{ nb_token }}"
+        validate_certs: false
+        data:
+          parent: 198.18.226.0/24
+          prefix_length: 29
+          tenant: "{{ nb_tenant }}"
+          site: "{{ nb_site }}"
+          description: "{{ nb_description }}"
+          prefix_role: "{{ nb_role }}"
+          vlan: 
+            name: "{{ nb_description }}"
+            site: "{{ nb_site }}"
+            vlan_group: "{{ nb_vlan_group }}"
+            tenant: "{{ nb_tenant }}"
+        state: present
+        first_available: True
+      register: prefix_data
+
+    - name: show prefix
+      set_fact:
+        prefix: "{{ prefix_data.prefix.prefix }}"
+        peer_asn: "{{ (vlan | int) + 65000 }}" 
+
+    - debug:
+        msg:
+          - "{{ prefix }}"
+          - "{{ vlan }}"
+          - "{{ peer_asn }}"

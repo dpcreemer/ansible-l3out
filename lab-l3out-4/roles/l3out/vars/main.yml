@@ -1,0 +1,22 @@
+---
+# vars file for l3out
+tenant: ansible
+vrf: prod
+l3out: core
+dom: l3out
+node_prof: leaves
+pod: 1
+nodes: 
+  - { id: 101, router_id: 172.31.254.13 }
+  - { id: 102, router_id: 172.31.254.14 }
+ifc_prof: interfaces
+ifcs: 
+  - { node: 101, ifc: 'eth1/45', addr: '198.19.100.1/31', peer: '198.19.100.0' }
+  - { node: 101, ifc: 'eth1/47', addr: '198.19.100.3/31', peer: '198.19.100.2' }
+  - { node: 102, ifc: 'eth1/45', addr: '198.19.100.5/31', peer: '198.19.100.4' }
+  - { node: 102, ifc: 'eth1/47', addr: '198.19.100.7/31', peer: '198.19.100.6' }
+vlan: 128
+peer_asn: 65000
+local_as: 65029
+contract: l3out-core-default
+

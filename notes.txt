@@ -1,0 +1,91 @@
+From new linux VM...
+- Installing pip for python3
+	- sudo apt install python3-pip
+- Installing Ansible
+	- https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html
+	- sudo pip3 install ansible
+	- verify with: ansible --version
+- Add modules
+	- ansible-galaxy collection install cisco.aci
+- Create file structure
+	- project root ~/Development/ansible/lab-l3out
+	- https://aci-prog-lab.ciscolive.com/lab/pod1/bonus/ansible-aci
+	- mkdir group_vars
+	- mkdir roles
+	- hosts file
+			# hosts file for Ansible Playbook
+			[apic]
+			bloom-aci.rtp.lab
+	- site.yaml file
+			--- 
+			# main playbook
+			- hosts: apic
+			  roles:
+			  - role: tenant
+			  - role: l3out
+	- group_vars/all file
+			---
+			ansible_connection: local
+			user: labowski
+			password: TheDudeAbides!
+	- create roles
+		- cd roles
+		- ansible-galaxy init tenant
+		- ansible-galaxy init l3out
+- Validate environment is ready
+	- ansible-playbook -vi hosts site.yaml
+- Setup tenant role
+	- edit vars/main.yaml
+	- edit tasks/main.yaml
+- validate
+	- ansible-playbook -vi hosts site.yaml
+- Problem 1:  Have to repeat hostname, username, password, and validate_certs in every task
+	- https://blog.wimwauters.com/devops/2020-01-16-aci_ansible/
+	- use the merge operator <<
+- Setup l3out role
+	- edit vars/main.yaml and tasks/main.yaml
+	- Create root l3out object with  aci_l3out module 
+		- Problem 2:  "Invalid Configuration Unenforced Route Control is not supported for Export direction."
+			- fix 1:  Set "route_control" to "export" in task
+			- fix 2:  Fix the module so that "export" is the default
+				- edit module: ~/.ansible/collections/ansible_collections/cisco/aci/plugins/modules/aci_l3out.py
+				- change line 293
+					- from:    enforce_ctrl = ''
+					- to:          enforce_ctrl = 'export'
+	- Create Logical Node Profile with aci_l3out_logical_node_profile
+	- Add nodes to node profile with aci_l3out_logical_node
+		- Problem 3: Repetition
+			- fix: use loops. https://docs.ansible.com/ansible/latest/user_gucd ide/playbooks_loops.html
+		- Problem 4: Scale
+			- fix: make "nodes" list in var file with.  Each node is a dictionary of Node ID and Router ID.
+	- Add interface profile with aci_l3out_logical_interface_profile
+	- Add interfaces with aci_l3out_interface
+		- Problem: Repetition inside list
+	- Add BGP peer info with aci_l3out_bgp_peer
+		- Problem: Module has no way to define local AS
+		- Fix:  Modify Module: 
+	- Add External EPG/Network
+	- Do Contract stuff
+		- Add Contract/Subject/Filter
+		- Add Contract to extEPG and VRF
+
+Ok, now we have a working solution, so how can we make it better?
+- Don't use stored credentials (prompt)   -  (Ok, I know we could use Vault or some fancy shit.  Maybe later...)
+	- (New project)
+	- https://docs.ansible.com/ansible/latest/user_guide/playbooks_prompts.html
+	- Add vars_prompt to site.yaml
+	- Remove stored credentials from group_vars/all
+- I provide the leaf sub-interface address, the peer address should be obvious.  Can I calculate that instead of putting it in as a variable?
+	- https://docs.ansible.com/ansible/latest/user_guide/playbooks_filters_ipaddr.html
+	- install netaddr module:
+		- pip3 install netaddr
+	- Change VAR file to use "net" for ip peering info and change tasks to calculate leaf address and peer address.
+
+What about NetBox?  I need to find available network/vlan/and ASN info...
+- Fetch data from Netbox
+	- Install netbox.netbox collection
+		- ansible-galaxy collection install netbox.netbox
+		- pip3 install pynetbox
+	- Prefix  
+		- https://docs.ansible.com/ansible/latest/collections/netbox/netbox/index.html#plugins-in-netbox-netbox
+

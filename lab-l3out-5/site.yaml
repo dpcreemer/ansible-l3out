@@ -1,0 +1,14 @@
+---
+# main playbook
+- hosts: apic
+  vars_prompt:
+    - name: user
+      prompt: "Username"
+      private: no
+
+    - name: password
+      prompt: "Password"
+
+  roles:
+  - role: tenant
+  - role: l3out

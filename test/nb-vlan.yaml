@@ -1,0 +1,60 @@
+---
+- name: Gather data frome NetBox
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  vars:
+    url: https://netbox.prod.rtp.lab
+    token: 8ba32002b54ae0f5402bc9ec4bc42f0cbf7b8d52
+    vlan_mod: netbox.netbox.nb_lookup
+    vlan: -1
+
+  tasks:
+    - name: Read VLANs from NetBox
+      set_fact: 
+        vlans: "{{ query(vlan_mod, 'vlans', api_endpoint=url, token=token, api_filter='vlan_group=ACI1', validate_certs=False) }}"
+
+    - debug: 
+        msg:
+          - "VLANs: {{ vlans }}"
+
+    - name: Parse VLAN list
+      set_fact:
+        vlan_list: "{{ vlan_list | default([]) + [ item.value.vid ] }}"
+      with_items: "{{ query(vlan_mod, 'vlans', api_endpoint=url, token=token, api_filter='vlan_group=ACI1', validate_certs=False) }}"
+
+    - debug:
+        msg:
+          - "VLANs: {{ vlan_list }}"
+
+    - name: Find available VLAN
+      set_fact:
+        vlan: "{{ item }}"
+        lst: "{{ lst | default([]) + [ item | int ] }}"
+      with_sequence: start=117 end=200
+      when:
+        - "item | int not in vlan_list"
+        - vlan == -1
+
+    - debug:
+        msg: 
+          - "VLAN: {{ vlan }}"
+
+    - name: Create VLAN in NetBox
+      netbox.netbox.netbox_vlan:
+        netbox_url: "{{ url }}"
+        netbox_token: "{{ token }}"
+        validate_certs: False
+        data:
+          vid: "{{ vlan | int }}"
+          name: ACI tn:ansible l3-Out to Core
+          site: RTP lab
+          vlan_group: ACI1
+          vlan_role: ACI 1 L3Out
+          description: ACI Ansible Tenant L3-Out to Core
+        state: present
+      register: vlan_data
+
+    - debug:
+        msg:
+          - "VLAN: {{vlan_data}}"

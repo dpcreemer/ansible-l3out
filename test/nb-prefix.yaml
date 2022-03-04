@@ -1,0 +1,31 @@
+---
+- name: Gather data frome NetBox
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  vars:
+    url: https://netbox.prod.rtp.lab
+    token: 8ba32002b54ae0f5402bc9ec4bc42f0cbf7b8d52
+
+  tasks:
+    - name: Get a new /29 from 198.18.226.0/24
+      netbox_prefix:
+        netbox_url: "{{ url }}"
+        netbox_token: "{{ token }}"
+        validate_certs: false
+        data:
+          parent: 198.18.226.0/24
+          prefix_length: 29
+          tenant: ACI1
+          site: RTP Lab
+          description: ACI tn:ansible L3-Out to Core
+        state: present
+        first_available: True
+      register: prefix_data
+
+    - name: show prefix
+      set_fact:
+        prefix: "{{ prefix_data.prefix.prefix }}"
+    - debug:
+        msg:
+          - "{{ prefix }}"

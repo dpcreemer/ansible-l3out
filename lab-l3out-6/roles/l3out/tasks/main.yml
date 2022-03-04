@@ -1,0 +1,195 @@
+---
+- name: Set some variables
+  vars:
+    aci_login: &aci_login
+      hostname: "{{ inventory_hostname }}"
+      username: "{{ user }}"
+      password: "{{ password }}"
+      validate_certs: False
+  set_fact:
+    vlan: -1
+    vlan_list: []
+    nb_description: "ACI tn:{{ tenant }} L3Out to Core"
+
+# =============== NetBox stuff =================
+- name: Get VLANs from Netbox 
+  set_fact:
+    vlan_list: "{{ vlan_list + [ item.value.vid ] }}"
+  with_items: "{{ query('netbox.netbox.nb_lookup', 'vlans', api_endpoint=nb_url, token=nb_token, api_filer='vlan_group='+nb_vlan_group, validate_certs=False) }}"
+    
+- debug:
+    msg:
+      - "{{ vlan_list }}"
+
+- name: Find available VLAN
+  set_fact:
+    vlan: "{{ item }}"
+  with_sequence: start=50 end=149
+  when:
+    - "item | int not in vlan_list"
+    - vlan == -1
+
+- name: Create VLAN in NetBox
+  netbox.netbox.netbox_vlan:
+    netbox_url: "{{ nb_url }}"
+    netbox_token: "{{ nb_token }}"
+    validate_certs: False
+    data:
+      vid: "{{ vlan | int }}"
+      name: "{{ nb_description }}"
+      site: "{{ nb_site }}"
+      vlan_group: "{{ nb_vlan_group }}"
+      tenant: "{{ nb_tenant }}"
+      vlan_role: "{{ nb_role }}"
+    state: present
+
+- name: Get a new /29 from 198.18.226.0/24 and tag it with the VLAN
+  netbox_prefix:
+    netbox_url: "{{ nb_url }}"
+    netbox_token: "{{ nb_token }}"
+    validate_certs: false
+    data:
+      parent: 198.18.226.0/24
+      prefix_length: 29
+      tenant: "{{ nb_tenant }}"
+      site: "{{ nb_site }}"
+      description: "{{ nb_description }}"
+      prefix_role: "{{ nb_role }}"
+      vlan:
+        name: "{{ nb_description }}"
+        site: "{{ nb_site }}"
+        vlan_group: "{{ nb_vlan_group }}"
+        tenant: "{{ nb_tenant }}"
+    state: present
+    first_available: True
+  register: prefix_data
+
+- name: Define prefix and ASN
+  set_fact:
+    prefix: "{{ prefix_data.prefix.prefix }}"
+    local_as: "{{ (vlan | int) + 65000 }}"
+# ================ End of Netbox stuff ===================
+
+# ================ Start of APIC stuff ===================
+- name: Create L3 Out
+  cisco.aci.aci_l3out:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    vrf: "{{ vrf }}"
+    l3out: "{{ l3out }}"
+    domain: "{{ dom }}"
+    l3protocol: "bgp"
+
+- name: Create Node Profile
+  cisco.aci.aci_l3out_logical_node_profile:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+
+- name: Add Nodes to Profile
+  cisco.aci.aci_l3out_logical_node:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+    pod_id: "{{ pod }}"
+    node_id: "{{ item.id }}"
+    router_id: "{{ item.router_id }}"
+  loop: "{{ nodes }}"
+
+- name: Create Interface Profile
+  cisco.aci.aci_l3out_logical_interface_profile:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+    interface_profile: "{{ ifc_prof }}"
+
+- name: Add interfaces to Interface Profile
+  cisco.aci.aci_l3out_interface:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+    interface_profile: "{{ ifc_prof }}"
+    pod_id: "{{ pod }}"
+    node_id: "{{ item.node }}"
+    path_ep: "{{ item.ifc }}"
+    encap: "vlan-{{ vlan }}"
+    addr: "{{ prefix | ipsubnet(31, idx) | ipaddr('peer') }}/31"
+    interface_type: sub-interface
+  loop: "{{ ifcs }}"
+  loop_control: 
+    index_var: idx
+
+- name: Add BGP Peering Info
+  cisco.aci.aci_l3out_bgp_peer:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+    interface_profile: "{{ ifc_prof }}"
+    pod_id: "{{ pod }}"
+    node_id: "{{ item.node }}"
+    path_ep: "{{ item.ifc }}"
+    peer_ip: "{{ prefix | ipsubnet(31, idx) | ipaddr('address') }}"
+    remote_asn: "{{ peer_asn }}"
+    local_as_mode: "replace-as"
+    local_as: "{{ local_as }}"
+  loop: "{{ ifcs }}"
+  loop_control:
+    index_var: idx
+
+- name: Create External EPG
+  cisco.aci.aci_l3out_extepg:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    extepg: "default"
+
+- name: Add Subnet to External EPG
+  cisco.aci.aci_l3out_extsubnet:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    extepg: "default"
+    network: "0.0.0.0/0"
+
+- name: Create Contract for External EPG
+  cisco.aci.aci_contract:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    contract: "{{ contract }}"
+
+- name: Add Subject to Contract
+  cisco.aci.aci_contract_subject:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    contract: "{{ contract }}"
+    subject: "all"
+
+- name: Add Filter to Contract
+  cisco.aci.aci_contract_subject_to_filter:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    contract: "{{ contract }}"
+    subject: "all"
+    filter: "default"
+
+- name: Attach Contract to External EPG
+  cisco.aci.aci_l3out_extepg_to_contract:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    extepg: "default"
+    contract: "{{ contract }}"
+    contract_type: "provider"
+
+- name: Attach Contract to VRF as VZAny
+  cisco.aci.aci_vzany_to_contract:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    vrf: "{{ vrf }}"
+    contract: "{{ contract }}"
+    type: "consumer"

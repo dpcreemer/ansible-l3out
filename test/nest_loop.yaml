@@ -1,0 +1,52 @@
+---
+- name: Trying to do a Nested Loop
+  hosts: localhost
+  connection: 127.0.0.1
+
+  vars:
+    nodes: 
+      - { pod: 1, node: 101 }
+      - { pod: 1, node: 102 }
+      - { pod: 2, node: 201 }
+      - { pod: 2, node: 202 }
+    ifcs: 
+      - { ifc: 'eth1/45' }
+      - { ifc: 'eth1/47' }
+    addresses:
+      - { addr: '198.19.99.101/31' }
+      - { addr: '198.19.99.103/31' }
+      - { addr: '198.19.99.105/31' }
+      - { addr: '198.19.99.107/31' }
+      - { addr: '198.19.99.109/31' }
+      - { addr: '198.19.99.111/31' }
+      - { addr: '198.19.99.113/31' }
+      - { addr: '198.19.99.115/31' }
+
+  tasks:
+    - name: Print message
+      debug:
+        msg:
+          - "{{ item.pod }}/{{ item.node }}"
+      loop: "{{ nodes }}"
+    
+    - name: Create the list
+      set_fact:
+        ifc_dets: "{{
+          [
+            {% for node in nodes %}
+            {%   for ifc in ifcs %}
+            {{ node | combine(ifc) }}
+            {%   endfor %}
+            {% endfor %}
+          ] }}"
+
+    - name: show ifc_dets
+      debug:
+        msg: "{{ item }}"
+      loop: "{{ list(ifc_dets) }}"
+
+    - name: Something else
+      debug:
+        msg:
+          - "{{ item[0].pod }}/{{ item[0].node }}/{{ item[1].ifc }}"
+      loop: "{{ nodes | product(ifcs) | combine(addresses) }}"

@@ -1,0 +1,126 @@
+---
+- name: Create L3 Out
+  vars:
+    aci_login: &aci_login
+      hostname: "{{ inventory_hostname }}"
+      username: "{{ user }}"
+      password: "{{ password }}"
+      validate_certs: False
+
+  cisco.aci.aci_l3out:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    vrf: "{{ vrf }}"
+    l3out: "{{ l3out }}"
+    domain: "{{ dom }}"
+    l3protocol: "bgp"
+
+- name: Create Node Profile
+  cisco.aci.aci_l3out_logical_node_profile:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+
+- name: Add Nodes to Profile
+  cisco.aci.aci_l3out_logical_node:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+    pod_id: "{{ pod }}"
+    node_id: "{{ item.id }}"
+    router_id: "{{ item.router_id }}"
+  loop: "{{ nodes }}"
+
+- name: Create Interface Profile
+  cisco.aci.aci_l3out_logical_interface_profile:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+    interface_profile: "{{ ifc_prof }}"
+
+- name: Add interfaces to Interface Profile
+  cisco.aci.aci_l3out_interface:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+    interface_profile: "{{ ifc_prof }}"
+    pod_id: "{{ pod }}"
+    node_id: "{{ item.node }}"
+    path_ep: "{{ item.ifc }}"
+    encap: "vlan-{{ vlan }}"
+    addr: "{{ item.addr }}"
+    interface_type: sub-interface
+  loop: "{{ ifcs }}"
+
+- name: Add BGP Peering Info
+  cisco.aci.aci_l3out_bgp_peer:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+    interface_profile: "{{ ifc_prof }}"
+    pod_id: "{{ pod }}"
+    node_id: "{{ item.node }}"
+    path_ep: "{{ item.ifc }}"
+    peer_ip: "{{ item.peer }}"
+    remote_asn: "{{ peer_asn }}"
+    local_as_mode: "replace-as"
+    local_as: "{{ local_as }}"
+  loop: "{{ ifcs }}"
+
+- name: Create External EPG
+  cisco.aci.aci_l3out_extepg:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    extepg: "default"
+
+- name: Add Subnet to External EPG
+  cisco.aci.aci_l3out_extsubnet:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    extepg: "default"
+    network: "0.0.0.0/0"
+
+- name: Create Contract for External EPG
+  cisco.aci.aci_contract:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    contract: "{{ contract }}"
+
+- name: Add Subject to Contract
+  cisco.aci.aci_contract_subject:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    contract: "{{ contract }}"
+    subject: "all"
+
+- name: Add Filter to Contract
+  cisco.aci.aci_contract_subject_to_filter:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    contract: "{{ contract }}"
+    subject: "all"
+    filter: "default"
+
+- name: Attach Contract to External EPG
+  cisco.aci.aci_l3out_extepg_to_contract:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    extepg: "default"
+    contract: "{{ contract }}"
+    contract_type: "provider"
+
+- name: Attach Contract to VRF as VZAny
+  cisco.aci.aci_vzany_to_contract:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    vrf: "{{ vrf }}"
+    contract: "{{ contract }}"
+    type: "consumer"

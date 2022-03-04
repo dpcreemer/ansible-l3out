@@ -1,0 +1,36 @@
+---
+- name: Gather Data from Netbox
+  hosts: localhost
+  connection: local
+  vars:
+    url: "https://netbox.prod.rtp.lab"
+    token: 8ba32002b54ae0f5402bc9ec4bc42f0cbf7b8d52
+
+  tasks:
+    - name: Query NetBox ASNs 
+      uri:
+        url: "{{ url }}/api/ipam/asns"
+        method: GET
+        headers:
+          Content-Type: "application/json"
+          Authorization: "token {{ token }}"
+        status_code: 200
+        return_content: True
+        validate_certs: False
+      register: search_result
+
+    - debug:
+        msg:
+          - "{{ search_result.json.results }}"
+
+    - name: Add ASN to NetBox
+      uri:
+        url: "{{ url }}/api/ipam/asns"
+        method: POST
+        headers:
+          Content-Type: "application/json"
+          Authorization: "token {{ token }}"
+        validate_certs: False
+        body: "{{ {'asn': 65115, 'description': 'Ansible Tenant', 'rir': 1} }}"
+        body_format: json
+            

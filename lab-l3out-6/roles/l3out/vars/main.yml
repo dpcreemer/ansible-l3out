@@ -1,0 +1,28 @@
+---
+# vars file for l3out
+tenant: ansible
+vrf: prod
+l3out: core
+dom: l3out
+node_prof: leaves
+pod: 1
+nodes: 
+  - { id: 101, router_id: 172.31.254.13 }
+  - { id: 102, router_id: 172.31.254.14 }
+ifc_prof: interfaces
+ifcs: 
+  - { node: 101, ifc: 'eth1/45', net: '198.19.100.0/31' }
+  - { node: 101, ifc: 'eth1/47', net: '198.19.100.2/31' }
+  - { node: 102, ifc: 'eth1/45', net: '198.19.100.4/31' }
+  - { node: 102, ifc: 'eth1/47', net: '198.19.100.6/31' }
+peer_asn: 65000
+contract: l3out-core-default
+
+# NetBox
+nb_url: https://netbox.prod.rtp.lab
+nb_token: 8ba32002b54ae0f5402bc9ec4bc42f0cbf7b8d52
+nb_site: RTP Lab
+nb_vlan_group: ACI L3Out
+nb_tenant: ACI1
+nb_role: ACI 1 L3Out
+

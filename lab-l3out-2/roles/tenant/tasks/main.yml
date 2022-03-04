@@ -1,0 +1,21 @@
+---
+# tasks file for tenant
+- name: Create Tenant
+  vars:
+    aci_login: &aci_login
+      hostname: "{{ inventory_hostname }}"
+      username: "{{ user }}"
+      password: "{{ password }}"
+      validate_certs: false
+
+  cisco.aci.aci_tenant:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    name_alias: "{{ alias }}"
+    description: "{{ description }}"
+
+- name: Add VRF
+  cisco.aci.aci_vrf:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    vrf: "{{ vrf }}" 

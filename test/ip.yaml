@@ -1,0 +1,15 @@
+---
+- name: Hello World
+  hosts: localhost
+  connection: 127.0.0.1
+
+  vars:
+    peer_net: 198.18.226.104/29
+    
+  tasks:
+    - name: Say some stuff
+      debug:
+        msg:
+          - "First Subnet: {{ peer_net | ipsubnet(31, 0) }}"
+          - "Leaf addr: {{ peer_net | ipsubnet(31, 0) | ipaddr('peer')}}/31"
+          - "Peer addr: {{ peer_net | ipsubnet(31, 0) | ipaddr('address') }}"

@@ -1,0 +1,43 @@
+---
+- name: Create L3 Out
+  vars:
+    aci_login: &aci_login
+      hostname: "{{ inventory_hostname }}"
+      username: "{{ user }}"
+      password: "{{ password }}"
+      validate_certs: False
+
+  cisco.aci.aci_l3out:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    vrf: "{{ vrf }}"
+    l3out: "{{ l3out }}"
+    domain: "{{ dom }}"
+    l3protocol: "bgp"
+
+- name: Create Node Profile
+  cisco.aci.aci_l3out_logical_node_profile:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+
+- name: Add Node 1 to Profile
+  cisco.aci.aci_l3out_logical_node:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+    pod_id: "{{ pod }}"
+    node_id: "{{ node1_id }}"
+    router_id: "{{ node1_router_id }}"
+
+- name: Add Node 2 to Profile
+  cisco.aci.aci_l3out_logical_node:
+    <<: *aci_login
+    tenant: "{{ tenant }}"
+    l3out: "{{ l3out }}"
+    node_profile: "{{ node_prof }}"
+    pod_id: "{{ pod }}"
+    node_id: "{{ node2_id }}"
+    router_id: "{{ node2_router_id }}"

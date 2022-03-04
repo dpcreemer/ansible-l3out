@@ -1,0 +1,6 @@
+---
+# main playbook
+- hosts: apic
+  roles:
+  - role: tenant
+  - role: l3out

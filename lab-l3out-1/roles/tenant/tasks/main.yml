@@ -1,0 +1,22 @@
+---
+# tasks file for tenant
+- name: Create Tenant
+  cisco.aci.aci_tenant:
+    hostname: "{{ inventory_hostname }}"
+    username: "{{ user }}"
+    password: "{{ password }}"
+    use_ssl: yes
+    validate_certs: false
+    tenant: "{{ tenant }}"
+    name_alias: "{{ alias }}"
+    description: "{{ description }}"
+
+- name: Add VRF
+  cisco.aci.aci_vrf:
+    hostname: "{{ inventory_hostname }}"
+    username: "{{ user }}"
+    password: "{{ password }}"
+    use_ssl: yes
+    validate_certs: false
+    tenant: "{{ tenant }}"
+    vrf: "{{ vrf }}" 
